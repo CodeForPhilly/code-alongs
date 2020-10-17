@@ -1,0 +1,92 @@
+---
+title: "NCAA Women's Basketball"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+raw_data <- "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-10-06/tournament.csv"
+```
+
+
+```{r}
+ncaa <- read_csv(raw_data)
+```
+
+
+```{r}
+
+ncaa_64 <- ncaa %>%
+  add_count(year) %>%
+  filter(n == 64) %>%
+  select(-n) %>%
+  mutate(winner = tourney_finish == "Champ")
+
+```
+
+
+```{r}
+
+# Who wins?
+ncaa_64 %>%
+  group_by(seed) %>%
+  summarise(pct_win = mean(winner) * 4)
+
+```
+
+
+```{r}
+
+most_present_conferences <- ncaa_64 %>%
+  add_count(conference) %>%
+  filter(n > 100)
+
+```
+
+
+```{r}
+
+most_present_conferences %>%  
+  group_by(seed, conference) %>%
+  summarise(avg_wins = mean(tourney_w)) %>%
+  ungroup() %>%
+  filter(seed <= 12) %>%
+  mutate(conference = fct_reorder(conference, avg_wins, max, .desc = T),
+         seed = fct_rev(factor(seed))) %>%
+  ggplot(aes(x = conference, y = seed )) +
+  geom_tile(aes(fill = avg_wins)) +
+  scale_fill_distiller(palette = "Spectral") +
+  geom_label(aes(label = round(avg_wins, 2))) +
+  labs(title = "How do the best conferences advance up based on seed?",
+       x = "Conference",
+       y = "Starting seed") +
+  theme(legend.position = "none")
+
+```
+
+
+
+```{r}
+
+ncaa %>%
+  group_by(year, seed) %>%
+  summarise(tourney_distance = mean(tourney_w)) %>%
+  filter(seed <= 9) %>%
+  ggplot(aes(x = year, y = tourney_distance, group = factor(seed), color = factor(seed))) +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~factor(seed)) +
+  theme(legend.position = "None") +
+  labs(title = "How far do higher seeds get over time?",
+       x = "Year",
+       y = "Average # of wins in tournament")
+
+```
+
