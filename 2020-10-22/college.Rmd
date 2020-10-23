@@ -1,0 +1,105 @@
+---
+title: "College"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(rio)
+library(lubridate)
+library(tidyverse)
+library(tidymodels)
+```
+
+```{r}
+
+tuition_cost <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-10/tuition_cost.csv')
+
+tuition_income <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-10/tuition_income.csv') 
+
+salary_potential <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-10/salary_potential.csv')
+
+historical_tuition <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-10/historical_tuition.csv')
+
+diversity_school <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-10/diversity_school.csv')
+
+```
+
+
+```{r}
+
+# 2018-2019 tuition cost
+tuition_cost %>% glimpse()
+  count(name, state, sort = T)
+
+# State is actually state code  
+tuition_income %>% 
+  mutate(income_lvl = factor(income_lvl)) %>%
+  ggplot(aes(x = income_lvl, y = net_cost, group = income_lvl)) +
+  geom_boxplot() +
+  facet_wrap(~year) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Does a college you pay more to go to get you a higher salary when you leave?
+
+```{r}
+
+tuition_cost %>%
+  count(type , in_state_tuition == out_of_state_tuition)
+
+costs_and_salaries <- tuition_cost %>% 
+  select(name, state, type,in_state_tuition, out_of_state_tuition) %>%
+  inner_join(
+    salary_potential %>% 
+      rename(state = state_name),
+    by = c("name", "state")
+  )
+
+```
+
+```{r}
+
+costs_and_salaries %>%
+  select(name, type, in_state_tuition, out_of_state_tuition, early_career_pay) %>% 
+  gather(metric, value, -name, -early_career_pay, -type) %>%
+  ggplot(aes(x = value, y = early_career_pay)) +
+  geom_point(aes(color = type)) +
+  facet_wrap(~str_to_title(str_replace_all(metric, "_", " "))) +
+  geom_smooth(method = "lm", se = F, lty = 2, color = "black") +
+  scale_y_continuous(labels = scales::dollar_format(1)) +
+  scale_x_continuous(labels = scales::dollar_format(1)) +
+  labs(title = "Do higher tuitions mean higher early career pay?",
+       subtitle = "It looks like it!",
+       x = "Tution",
+       y = "Early career pay",
+       color = "Instiution type")
+
+```
+
+What about disparity between in-state and out of state tuition?
+
+```{r}
+
+costs_and_salaries %>%
+  select(name, type, in_state_tuition, out_of_state_tuition, early_career_pay) %>%
+  filter(type == "Public") %>%
+  mutate(tuition_difference = out_of_state_tuition - in_state_tuition) %>%
+  arrange(desc(tuition_difference)) %>% 
+  ggplot(aes(x = tuition_difference, y = early_career_pay)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  expand_limits(y = 0) +
+  scale_x_continuous(labels = scales::dollar_format(1)) +
+  scale_y_continuous(labels = scales::dollar_format(1)) +
+  labs(title = "Do public schools that charge more earn more?",
+       subtitle = "When public schools charge more for out-of-state tuition",
+       x = "Difference between out-of-state and in-state tuition",
+       y = "Early career pay")
+
+```
+
